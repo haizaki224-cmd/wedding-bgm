@@ -231,6 +231,10 @@ a.yt-link:hover{background:#cc0000;}
   </div>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <div class="filter-bar" id="filter-bar"></div>
 
 <div id="list-wrap">
@@ -666,7 +670,21 @@ const SONGS = [
   {title:"花束にして",                       artist:"wacci",               url:"https://www.youtube.com/watch?v=i3iqO5ho3Dk", dur:"5:08"},
 ];
 
-/* ── localStorage 永続化 ── */
+/* ── Firebase 設定 ── */
+const firebaseConfig={
+  apiKey:"AIzaSyBafVdZPHLb0Ym_xFmtkC3B1FicWY6lQp8",
+  authDomain:"wedding-bgm.firebaseapp.com",
+  databaseURL:"https://wedding-bgm-default-rtdb.firebaseio.com",
+  projectId:"wedding-bgm",
+  storageBucket:"wedding-bgm.firebasestorage.app",
+  messagingSenderId:"964534974388",
+  appId:"1:964534974388:web:e63c118844d5eb264e24e1"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+const songsRef=db.ref('songs');
+
+/* ── 行データ収集 ── */
 function collectRows(){
   return[...document.querySelectorAll('#song-list .song-row')].map(row=>({
     title:  row.querySelector('.cell-title').textContent.trim(),
@@ -677,29 +695,102 @@ function collectRows(){
     note:   row.querySelector('.cell-note').textContent.trim(),
   }));
 }
+
+/* ── Firebase へ保存（デバウンス）── */
+let lastSaveTime=0;
 const saveDeb=debounce(()=>{
-  localStorage.setItem('bgm_songs',JSON.stringify(collectRows()));
-},600);
+  lastSaveTime=Date.now();
+  songsRef.set(collectRows()).catch(e=>console.error('save error',e));
+},800);
 function triggerSave(){saveDeb();}
 
-function loadSongs(){
-  try{const s=localStorage.getItem('bgm_songs');return s?JSON.parse(s):null;}
-  catch(e){return null;}
+/* ── アートワークキャッシュ付き DOM 再構築 ── */
+function rebuildFromData(songs){
+  const list=document.getElementById('song-list');
+  // 既存のアートワーク URL をタイトル+アーティストをキーにキャッシュ
+  const artCache={};
+  list.querySelectorAll('.song-row').forEach(row=>{
+    const img=row.querySelector('.thumb-img');
+    if(img&&img.src&&img.style.display!=='none'){
+      const k=row.querySelector('.cell-title').textContent.trim()+'||'+row.querySelector('.cell-artist').textContent.trim();
+      artCache[k]=img.src;
+    }
+  });
+  list.innerHTML='';
+  songs.forEach((s,i)=>{
+    const row=makeRow(s);
+    list.appendChild(row);
+    const k=(s.title||'')+'|'+(s.artist||'');
+    if(artCache[k]){
+      const img=row.querySelector('.thumb-img');
+      img.src=artCache[k];img.style.display='block';
+      row.querySelector('.thumb-placeholder').style.display='none';
+    } else {
+      setTimeout(()=>fetchArtwork(row),i*200);
+    }
+  });
+  updateNumbers();
+  applyFilter();
+}
+
+/* ── 同期トースト ── */
+function showSyncToast(){
+  let t=document.getElementById('sync-toast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='sync-toast';
+    Object.assign(t.style,{
+      position:'fixed',bottom:'20px',right:'20px',
+      background:'#333',color:'#fff',padding:'8px 16px',
+      borderRadius:'20px',fontSize:'13px',zIndex:9999,
+      transition:'opacity .3s',pointerEvents:'none'
+    });
+    document.body.appendChild(t);
+  }
+  t.textContent='🔄 同期しました';
+  t.style.opacity='1';
+  clearTimeout(t._tid);
+  t._tid=setTimeout(()=>t.style.opacity='0',2000);
 }
 
 /* ── Init ── */
 renderFilterBar();
 const list=document.getElementById('song-list');
-const initSongs=loadSongs()||SONGS;
-initSongs.forEach((s,i)=>{
-  const row=makeRow(s);
-  list.appendChild(row);
-  setTimeout(()=>fetchArtwork(row),i*200);
-});
-updateNumbers();
 updateKeyBtn();
 
-// 全編集イベントで自動保存
+// Firebase からデータ取得・リアルタイム同期
+let fbReady=false;
+songsRef.on('value',snapshot=>{
+  const raw=snapshot.val();
+  const songs=raw?(Array.isArray(raw)?raw:Object.values(raw)):null;
+
+  if(!fbReady){
+    fbReady=true;
+    if(songs&&songs.length>0){
+      // Firebase にデータあり
+      rebuildFromData(songs);
+    } else {
+      // 初回：デフォルトデータを書き込む
+      lastSaveTime=Date.now();
+      songsRef.set(SONGS);
+      SONGS.forEach((s,i)=>{
+        const row=makeRow(s);
+        list.appendChild(row);
+        setTimeout(()=>fetchArtwork(row),i*200);
+      });
+      updateNumbers();
+    }
+    return;
+  }
+
+  // 自分が書き込んだ直後のエコーは無視（2秒以内）
+  if(Date.now()-lastSaveTime<2000)return;
+
+  // お嫁さん（別端末）からの変更 → 画面を更新
+  if(songs){rebuildFromData(songs);showSyncToast();}
+});
+
+// 全編集イベントで Firebase に保存
 document.getElementById('song-list').addEventListener('input',triggerSave);
 document.getElementById('song-list').addEventListener('change',triggerSave);
 </script>
