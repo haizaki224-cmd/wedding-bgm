@@ -488,6 +488,7 @@ function addRow(){
   const row=makeRow({title:'',artist:'',url:'',dur:'',scene:'',note:''});
   document.getElementById('song-list').appendChild(row);
   updateNumbers();
+  triggerSave();
   row.querySelector('.cell-title').focus();
 }
 function deleteRow(btn){
@@ -495,6 +496,7 @@ function deleteRow(btn){
   if(list.children.length<=1)return;
   btn.closest('.song-row').remove();
   updateNumbers();
+  triggerSave();
 }
 
 /* ── API key ── */
@@ -568,6 +570,7 @@ function setupDeskDrag(row){
     dragSrc=null;
     document.querySelectorAll('.song-row').forEach(r=>r.classList.remove('dragging','drag-over'));
     updateNumbers();
+    triggerSave();
   });
   row.addEventListener('dragover',e=>{
     e.preventDefault();
@@ -631,6 +634,7 @@ function setupTouchDrag(row){
     ph.parentNode.insertBefore(row,ph);
     ph.remove();ghost.remove();ghost=null;ph=null;
     updateNumbers();
+    triggerSave();
   });
 }
 
@@ -662,17 +666,42 @@ const SONGS = [
   {title:"花束にして",                       artist:"wacci",               url:"https://www.youtube.com/watch?v=i3iqO5ho3Dk", dur:"5:08"},
 ];
 
+/* ── localStorage 永続化 ── */
+function collectRows(){
+  return[...document.querySelectorAll('#song-list .song-row')].map(row=>({
+    title:  row.querySelector('.cell-title').textContent.trim(),
+    artist: row.querySelector('.cell-artist').textContent.trim(),
+    url:    row.querySelector('.yt-link-wrap a')?.href||'',
+    dur:    row.querySelector('.dur-cell').textContent.trim(),
+    scene:  row.querySelector('.scene-select').value,
+    note:   row.querySelector('.cell-note').textContent.trim(),
+  }));
+}
+const saveDeb=debounce(()=>{
+  localStorage.setItem('bgm_songs',JSON.stringify(collectRows()));
+},600);
+function triggerSave(){saveDeb();}
+
+function loadSongs(){
+  try{const s=localStorage.getItem('bgm_songs');return s?JSON.parse(s):null;}
+  catch(e){return null;}
+}
+
 /* ── Init ── */
 renderFilterBar();
 const list=document.getElementById('song-list');
-SONGS.forEach((s,i)=>{
+const initSongs=loadSongs()||SONGS;
+initSongs.forEach((s,i)=>{
   const row=makeRow(s);
   list.appendChild(row);
-  // Stagger iTunes requests to avoid rate limits
   setTimeout(()=>fetchArtwork(row),i*200);
 });
 updateNumbers();
 updateKeyBtn();
+
+// 全編集イベントで自動保存
+document.getElementById('song-list').addEventListener('input',triggerSave);
+document.getElementById('song-list').addEventListener('change',triggerSave);
 </script>
 </body>
 </html>
