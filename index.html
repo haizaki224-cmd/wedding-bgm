@@ -463,8 +463,13 @@ function makeRow(s){
     <div class="c-note">
       <div class="editable cell-note" contenteditable spellcheck="false">${s.note||''}</div>
     </div>
-    <div class="c-del"><button class="btn-del" onclick="deleteRow(this)">✕</button></div>
+    <div class="c-del"><button class="btn-del">✕</button></div>
   `;
+
+  // iOSでonclickが効かない場合があるためtouchendも登録
+  const delBtn=row.querySelector('.btn-del');
+  delBtn.addEventListener('click',()=>deleteRow(delBtn));
+  delBtn.addEventListener('touchend',e=>{e.preventDefault();deleteRow(delBtn);});
 
   row.querySelector('.dur-cell').addEventListener('input',updateTotal);
   row.querySelector('.scene-select').addEventListener('change',()=>applyFilter());
