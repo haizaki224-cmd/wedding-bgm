@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>結婚式BGMリスト</title>
+<style>
+/* ── Reset ── */
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,'Hiragino Sans','Meiryo',sans-serif;background:#f4f5f7;color:#222;padding:24px 16px;min-width:0;}
+
+/* ── Toolbar ── */
+.toolbar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
+button{border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;padding:9px 16px;}
+.btn-add{background:#4caf50;color:#fff;}
+.btn-add:hover{background:#43a047;}
+.btn-key{background:#fff;color:#555;border:1px solid #ddd;}
+.btn-key:hover{background:#f5f5f5;}
+.btn-key.active{border-color:#4caf50;color:#4caf50;}
+.total-box{margin-left:auto;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:8px 16px;font-size:14px;text-align:right;white-space:nowrap;}
+.total-box strong{font-size:16px;color:#333;}
+.total-sub{font-size:11px;color:#aaa;margin-top:2px;}
+
+/* ── API key banner ── */
+#key-banner{display:none;background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:13px;}
+#key-banner p{margin-bottom:10px;color:#555;line-height:1.7;}
+#key-banner a{color:#1a73e8;}
+.key-row{display:flex;gap:8px;flex-wrap:wrap;}
+#key-input{flex:1;min-width:180px;padding:8px 12px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:monospace;}
+.btn-save-key{background:#1a73e8;color:#fff;}
+.btn-save-key:hover{background:#1558b0;}
+.btn-clear-key{background:#fff;color:#e53935;border:1px solid #ffcdd2;}
+
+/* ── Filter bar ── */
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;align-items:center;-webkit-overflow-scrolling:touch;}
+.filter-bar::-webkit-scrollbar{height:3px;}
+.filter-bar::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px;}
+
+/* chip wrapper for positioning × button */
+.chip-wrap{position:relative;display:inline-flex;flex-shrink:0;}
+.filter-chip{
+  padding:7px 14px;border-radius:20px;font-size:13px;white-space:nowrap;
+  background:#fff;border:1.5px solid #ddd;color:#555;
+  transition:all .15s;cursor:pointer;
+}
+.filter-chip:hover{border-color:#999;color:#333;}
+.filter-chip.active{border-color:transparent;color:#fff;background:var(--cc,#455a64);}
+.chip-all.active{background:#455a64;}
+
+/* × delete on scene chips */
+.chip-wrap .filter-chip{padding-right:26px;}
+.chip-del-btn{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:none;border:none;padding:0 2px;font-size:12px;line-height:1;
+  color:#aaa;cursor:pointer;border-radius:50%;
+}
+.filter-chip.active ~ .chip-del-btn{color:rgba(255,255,255,0.75);}
+.chip-del-btn:hover{color:#333;background:rgba(0,0,0,0.08);}
+.filter-chip.active ~ .chip-del-btn:hover{color:#fff;background:rgba(255,255,255,0.25);}
+
+/* add-scene chip */
+.chip-add-btn{
+  padding:7px 14px;border-radius:20px;font-size:13px;white-space:nowrap;flex-shrink:0;
+  background:#f5f5f5;border:1.5px dashed #ccc;color:#888;cursor:pointer;
+  transition:all .15s;
+}
+.chip-add-btn:hover{background:#e8f5e9;border-color:#81c784;color:#4caf50;}
+
+/* ── List wrapper ── */
+#list-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;}
+
+/* ── Desktop: grid ── */
+:root{--gcols:30px 36px 52px 1fr .6fr 108px 64px 130px .75fr 36px;}
+
+.song-header{
+  display:grid;grid-template-columns:var(--gcols);align-items:center;
+  background:#2e4057;color:#fff;font-size:12px;font-weight:600;
+  padding:0 4px;min-height:40px;
+}
+.song-header > div{padding:0 8px;white-space:nowrap;}
+
+.song-row{
+  display:grid;grid-template-columns:var(--gcols);align-items:center;
+  border-bottom:1px solid #f0f0f0;min-height:56px;
+  transition:background .1s;
+}
+.song-row:last-child{border-bottom:none;}
+.song-row:hover{background:#fafafa;}
+.song-row.drag-over{outline:2px solid #4caf50;outline-offset:-2px;background:#f0fff0;}
+.song-row.dragging{opacity:.35;}
+.song-row.hidden-row{display:none;}
+
+.c-drag{display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.c-num{text-align:center;color:#bbb;font-size:12px;padding:0 4px;}
+.c-thumb{padding:0 4px;}
+.c-title,.c-artist,.c-note{padding:0 6px;}
+.c-yt{padding:0 4px;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.c-dur{padding:0 4px;text-align:center;}
+.c-scene{padding:0 4px;}
+.c-del{display:flex;align-items:center;justify-content:center;padding:0 2px;}
+
+/* ── Thumbnail ── */
+.thumb-img{
+  width:48px;height:48px;object-fit:cover;border-radius:8px;display:none;
+  background:#eee;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.12);
+}
+.thumb-placeholder{
+  width:48px;height:48px;border-radius:8px;background:#eee;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;color:#ccc;flex-shrink:0;
+}
+
+/* ── Editable cells ── */
+.editable{
+  outline:none;width:100%;min-height:22px;border-radius:4px;
+  padding:3px 5px;font-family:inherit;font-size:14px;color:#222;
+}
+.editable:focus{background:#fffde7;box-shadow:0 0 0 2px #ffe08280;}
+.dur-cell{
+  display:inline-block;width:56px;text-align:center;
+  font-size:13px;font-family:'SF Mono','Courier New',monospace;
+  color:#555;outline:none;border-radius:4px;padding:2px 4px;
+}
+.dur-cell:focus{background:#fffde7;box-shadow:0 0 0 2px #ffe08280;}
+
+/* ── Scene select ── */
+.scene-select{
+  width:100%;padding:5px 4px;border:1px solid #e0e0e0;border-radius:6px;
+  font-size:12px;font-family:inherit;background:#fff;color:#444;
+  appearance:auto;cursor:pointer;
+}
+.scene-select:focus{outline:none;border-color:#4caf50;}
+
+/* ── YouTube & search ── */
+a.yt-link{
+  display:inline-block;background:#ff0000;color:#fff;
+  border-radius:5px;padding:5px 10px;font-size:12px;
+  text-decoration:none;white-space:nowrap;
+}
+a.yt-link:hover{background:#cc0000;}
+.btn-search-yt{
+  background:#e8f0fe;color:#1a73e8;border:1px solid #c5d8fd;
+  border-radius:5px;padding:4px 8px;font-size:11px;white-space:nowrap;
+}
+.btn-search-yt:hover{background:#d2e3fc;}
+.btn-search-yt:disabled{opacity:.5;cursor:not-allowed;}
+.search-status{font-size:11px;color:#888;text-align:center;}
+.search-status.err{color:#e53935;}
+
+/* ── Drag handle ── */
+.drag-handle{
+  font-size:18px;color:#ccc;cursor:grab;user-select:none;
+  line-height:1;padding:4px;touch-action:none;
+}
+.drag-handle:active{cursor:grabbing;}
+
+/* ── Delete button ── */
+.btn-del{background:none;color:#ccc;font-size:18px;padding:4px 6px;border-radius:6px;}
+.btn-del:hover{background:#fee;color:#e53935;}
+
+/* ══════════════════════════════════════════
+   MOBILE  (<= 680px)  — card layout
+══════════════════════════════════════════ */
+@media (max-width:680px){
+  body{padding:16px 12px;}
+  .song-header{display:none;}
+  #list-wrap{background:transparent;box-shadow:none;border-radius:0;}
+
+  .song-row{
+    display:grid;
+    grid-template-columns:56px 1fr auto 38px;
+    grid-template-rows:auto auto auto auto;
+    grid-template-areas:
+      "thumb  title   title  del"
+      "thumb  artist  artist  .  "
+      "yt     yt      scene  dur "
+      "note   note    note   note";
+    gap:5px;padding:12px;
+    background:#fff;border:1px solid #e8e8e8;border-radius:14px;
+    margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);
+    min-height:0;border-bottom:1px solid #e8e8e8;
+  }
+  .song-row:hover{background:#fff;}
+  .song-row.drag-over{outline:2px solid #4caf50;}
+
+  .c-drag{display:none;}
+  .c-num{display:none;}
+  .c-thumb{grid-area:thumb;padding:0;align-self:center;}
+  .c-title{grid-area:title;padding:0;align-self:end;}
+  .c-artist{grid-area:artist;padding:0;align-self:start;}
+  .c-yt{grid-area:yt;padding:0;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:6px;}
+  .c-dur{grid-area:dur;padding:0;align-self:center;}
+  .c-scene{grid-area:scene;padding:0;align-self:center;}
+  .c-note{grid-area:note;padding:0;border-top:1px solid #f5f5f5;padding-top:6px;margin-top:2px;}
+  .c-del{grid-area:del;padding:0;align-self:start;}
+
+  .thumb-img,.thumb-placeholder{width:46px;height:46px;}
+  .editable{font-size:15px;}
+  .c-artist .editable{font-size:13px;color:#777;}
+  .scene-select{font-size:13px;padding:6px 4px;}
+  .dur-cell{font-size:13px;}
+  .drag-handle{display:none;}
+  .btn-del{font-size:20px;}
+  a.yt-link{padding:6px 12px;font-size:13px;}
+  .btn-search-yt{padding:5px 10px;font-size:12px;}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button class="btn-add" onclick="addRow()">＋ 曲を追加</button>
+  <button class="btn-key" id="btn-key" onclick="toggleBanner()">⚙ APIキー設定</button>
+  <div class="total-box">
+    合計：<strong id="total-time">--:--</strong>
+    <div class="total-sub" id="total-sub"></div>
+  </div>
+</div>
+
+<div id="key-banner">
+  <p>
+    自動検索には <strong>YouTube Data API v3 のキー</strong> が必要です（無料）。<br>
+    <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>
+    でプロジェクト作成 → 「YouTube Data API v3」を有効化 → 「認証情報」→「APIキーを作成」<br>
+    取得したキーを貼り付けて保存してください。キーはこのブラウザ内にのみ保存されます。
+  </p>
+  <div class="key-row">
+    <input id="key-input" type="password" placeholder="AIza…">
+    <button class="btn-save-key" onclick="saveKey()">保存</button>
+    <button class="btn-clear-key" onclick="clearKey()">削除</button>
+  </div>
+</div>
+
+<div class="filter-bar" id="filter-bar"></div>
+
+<div id="list-wrap">
+  <div class="song-header">
+    <div></div><div></div><div></div>
+    <div>曲名</div>
+    <div>アーティスト</div>
+    <div style="text-align:center">YouTube</div>
+    <div style="text-align:center">尺</div>
+    <div>シーン</div>
+    <div>備考</div>
+    <div></div>
+  </div>
+  <div id="song-list"></div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   Scenes — dynamic, persisted to localStorage
+══════════════════════════════════════════ */
+const DEFAULT_SCENES = ['入場','退場','フラワーシャワー','歓談BGM','感動シーン','その他'];
+const CHIP_COLORS = ['#1976d2','#2e7d32','#c2185b','#6a1b9a','#c62828','#546e7a','#e65100','#00695c','#558b2f','#4527a0'];
+
+function loadScenes(){
+  try{const s=localStorage.getItem('bgm_scenes');return s?JSON.parse(s):[...DEFAULT_SCENES];}
+  catch(e){return[...DEFAULT_SCENES];}
+}
+function saveScenes(){localStorage.setItem('bgm_scenes',JSON.stringify(SCENES));}
+
+let SCENES = loadScenes();
+let currentFilter = '';
+
+function sceneColor(scene){
+  const i=SCENES.indexOf(scene);
+  return i>=0?CHIP_COLORS[i%CHIP_COLORS.length]:'#546e7a';
+}
+
+/* ── Filter bar render ── */
+function renderFilterBar(){
+  const bar=document.getElementById('filter-bar');
+  bar.innerHTML='';
+
+  // "すべて" chip
+  const all=document.createElement('button');
+  all.className='filter-chip chip-all'+(currentFilter===''?' active':'');
+  all.dataset.scene='';
+  all.textContent='すべて';
+  all.onclick=()=>setFilter(all);
+  bar.appendChild(all);
+
+  // Scene chips (with × delete)
+  SCENES.forEach((scene,idx)=>{
+    const wrap=document.createElement('span');
+    wrap.className='chip-wrap';
+
+    const btn=document.createElement('button');
+    btn.className='filter-chip'+(currentFilter===scene?' active':'');
+    btn.dataset.scene=scene;
+    btn.style.setProperty('--cc',CHIP_COLORS[idx%CHIP_COLORS.length]);
+    btn.textContent=scene;
+    btn.onclick=()=>setFilter(btn);
+
+    const del=document.createElement('button');
+    del.className='chip-del-btn';
+    del.textContent='×';
+    del.title='このシーンを削除';
+    del.onclick=(e)=>{e.stopPropagation();deleteScene(scene);};
+
+    wrap.appendChild(btn);
+    wrap.appendChild(del);
+    bar.appendChild(wrap);
+  });
+
+  // "＋ シーンを追加" chip
+  const addBtn=document.createElement('button');
+  addBtn.className='chip-add-btn';
+  addBtn.textContent='＋ シーンを追加';
+  addBtn.onclick=addScene;
+  bar.appendChild(addBtn);
+}
+
+function addScene(){
+  const name=(prompt('新しいシーン名を入力してください：')||'').trim();
+  if(!name)return;
+  if(SCENES.includes(name)){alert('そのシーン名はすでに存在します。');return;}
+  SCENES.push(name);
+  saveScenes();
+  renderFilterBar();
+  rebuildSceneOptions();
+}
+
+function deleteScene(scene){
+  if(!confirm(`「${scene}」を削除しますか？\nこのシーンが設定されている行は「未設定」になります。`))return;
+  SCENES=SCENES.filter(s=>s!==scene);
+  saveScenes();
+  // Reset rows using this scene
+  document.querySelectorAll('#song-list .song-row').forEach(row=>{
+    const sel=row.querySelector('.scene-select');
+    if(sel.value===scene)sel.value='';
+  });
+  if(currentFilter===scene)currentFilter='';
+  renderFilterBar();
+  rebuildSceneOptions();
+  applyFilter();
+}
+
+function rebuildSceneOptions(){
+  document.querySelectorAll('.scene-select').forEach(sel=>{
+    const cur=sel.value;
+    sel.innerHTML=sceneSelectHtml(cur);
+  });
+}
+
+/* ── Filter logic ── */
+function setFilter(chip){
+  currentFilter=chip.dataset.scene;
+  renderFilterBar(); // re-render to update active state
+  applyFilter();
+}
+function applyFilter(){
+  document.querySelectorAll('#song-list .song-row').forEach(row=>{
+    const scene=row.querySelector('.scene-select').value;
+    row.classList.toggle('hidden-row',currentFilter!==''&&scene!==currentFilter);
+  });
+  updateTotal();
+}
+
+/* ── Total ── */
+function parseDur(s){const m=(s||'').trim().match(/^(\d+):(\d{2})$/);return m?+m[1]*60+ +m[2]:null;}
+function fmtSec(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h?`${h}時間${m}分${sec.toString().padStart(2,'0')}秒`:`${m}分${sec.toString().padStart(2,'0')}秒`;}
+
+function updateTotal(){
+  const rows=[...document.querySelectorAll('#song-list .song-row')];
+  const visible=rows.filter(r=>!r.classList.contains('hidden-row'));
+  let total=0;
+  visible.forEach(r=>{const s=parseDur(r.querySelector('.dur-cell').textContent);if(s)total+=s;});
+  document.getElementById('total-time').textContent=total?fmtSec(total):'--:--';
+  const sub=currentFilter
+    ?`${currentFilter}のみ ${visible.length}曲 / 全${rows.length}曲`
+    :`全${rows.length}曲`;
+  document.getElementById('total-sub').textContent=sub;
+}
+function updateNumbers(){
+  document.querySelectorAll('#song-list .song-row').forEach((r,i)=>r.querySelector('.row-no').textContent=i+1);
+  updateTotal();
+}
+
+/* ── ms → mm:ss ── */
+function millisToMmSs(ms){const t=Math.round(ms/1000);return`${Math.floor(t/60)}:${(t%60).toString().padStart(2,'0')}`;}
+
+/* ── iTunes album art + 尺 ── */
+async function fetchArtwork(row){
+  const title=row.querySelector('.cell-title').textContent.trim();
+  const artist=row.querySelector('.cell-artist').textContent.trim();
+  if(!title&&!artist)return;
+  const img=row.querySelector('.thumb-img');
+  const ph=row.querySelector('.thumb-placeholder');
+  try{
+    const q=encodeURIComponent(`${artist} ${title}`);
+    for(const url of[
+      `https://itunes.apple.com/search?term=${q}&media=music&limit=3&country=jp`,
+      `https://itunes.apple.com/search?term=${q}&media=music&limit=3`
+    ]){
+      const res=await fetch(url);
+      const data=await res.json();
+      if(data.results&&data.results.length>0){
+        const match=data.results.find(r=>r.artistName.toLowerCase().includes(artist.toLowerCase()))||data.results[0];
+        // アートワーク
+        const art=match.artworkUrl100.replace('100x100bb','400x400bb');
+        img.src=art;img.style.display='block';ph.style.display='none';
+        // 尺（iTunes の trackTimeMillis は配信音源と完全一致で正確）
+        if(match.trackTimeMillis){
+          row.querySelector('.dur-cell').textContent=millisToMmSs(match.trackTimeMillis);
+          updateTotal();
+        }
+        return;
+      }
+    }
+  }catch(e){/* silent */}
+}
+
+/* ── YouTube cell update ── */
+function setYtLink(row,url){
+  const wrap=row.querySelector('.yt-link-wrap');
+  if(url&&url.includes('youtube.com')){
+    wrap.innerHTML=`<a class="yt-link" href="${url}" target="_blank">▶ 再生</a>`;
+  }else{
+    wrap.innerHTML='';
+  }
+}
+
+/* ── Scene select HTML ── */
+function sceneSelectHtml(val=''){
+  const opts=SCENES.map(s=>`<option value="${s}"${s===val?' selected':''}>${s}</option>`).join('');
+  return`<option value="">― 未設定 ―</option>${opts}`;
+}
+
+/* ── Debounce ── */
+function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
+
+/* ── Row factory ── */
+function makeRow(s){
+  const row=document.createElement('div');
+  row.className='song-row';
+
+  const hasUrl=!!(s.url&&s.url.includes('youtube.com'));
+
+  row.innerHTML=`
+    <div class="c-drag"><span class="drag-handle" title="ドラッグして並び替え">⠿</span></div>
+    <div class="c-num"><span class="row-no"></span></div>
+    <div class="c-thumb">
+      <img class="thumb-img" src="" style="display:none" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="thumb-placeholder">🎵</div>
+    </div>
+    <div class="c-title">
+      <div class="editable cell-title" contenteditable spellcheck="false">${s.title||''}</div>
+    </div>
+    <div class="c-artist">
+      <div class="editable cell-artist" contenteditable spellcheck="false">${s.artist||''}</div>
+    </div>
+    <div class="c-yt">
+      <div class="yt-link-wrap">${hasUrl?`<a class="yt-link" href="${s.url}" target="_blank">▶ 再生</a>`:''}</div>
+      <button class="btn-search-yt" onclick="autoSearch(this.closest('.song-row'))">🔍 自動検索</button>
+      <span class="search-status"></span>
+    </div>
+    <div class="c-dur"><span class="dur-cell" contenteditable spellcheck="false">${s.dur||''}</span></div>
+    <div class="c-scene">
+      <select class="scene-select">${sceneSelectHtml(s.scene||'')}</select>
+    </div>
+    <div class="c-note">
+      <div class="editable cell-note" contenteditable spellcheck="false">${s.note||''}</div>
+    </div>
+    <div class="c-del"><button class="btn-del" onclick="deleteRow(this)">✕</button></div>
+  `;
+
+  row.querySelector('.dur-cell').addEventListener('input',updateTotal);
+  row.querySelector('.scene-select').addEventListener('change',()=>applyFilter());
+
+  // Re-fetch artwork when title/artist change
+  const debouncedFetch=debounce(()=>fetchArtwork(row),800);
+  row.querySelector('.cell-title').addEventListener('input',debouncedFetch);
+  row.querySelector('.cell-artist').addEventListener('input',debouncedFetch);
+
+  setupTouchDrag(row);
+  setupDeskDrag(row);
+  return row;
+}
+
+function addRow(){
+  const row=makeRow({title:'',artist:'',url:'',dur:'',scene:'',note:''});
+  document.getElementById('song-list').appendChild(row);
+  updateNumbers();
+  row.querySelector('.cell-title').focus();
+}
+function deleteRow(btn){
+  const list=document.getElementById('song-list');
+  if(list.children.length<=1)return;
+  btn.closest('.song-row').remove();
+  updateNumbers();
+}
+
+/* ── API key ── */
+function getKey(){return localStorage.getItem('yt_api_key')||'';}
+function saveKey(){
+  const v=document.getElementById('key-input').value.trim();
+  if(!v)return;
+  localStorage.setItem('yt_api_key',v);
+  document.getElementById('key-input').value='';
+  updateKeyBtn();alert('保存しました。');
+}
+function clearKey(){localStorage.removeItem('yt_api_key');updateKeyBtn();alert('削除しました。');}
+function updateKeyBtn(){
+  const btn=document.getElementById('btn-key');
+  const has=!!getKey();
+  btn.classList.toggle('active',has);
+  btn.textContent=has?'⚙ APIキー設定済み':'⚙ APIキー設定';
+}
+function toggleBanner(){
+  const b=document.getElementById('key-banner');
+  b.style.display=b.style.display==='block'?'none':'block';
+}
+
+/* ── ISO 8601 duration parser ── */
+function parseISO(iso){
+  const m=iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if(!m)return'';
+  const h=+(m[1]||0),min=+(m[2]||0)+h*60,sec=+(m[3]||0);
+  return`${min}:${sec.toString().padStart(2,'0')}`;
+}
+
+/* ── Auto search (YouTube API) ── */
+async function autoSearch(row){
+  const key=getKey();
+  if(!key){toggleBanner();document.getElementById('key-banner').scrollIntoView({behavior:'smooth'});return;}
+  const title=row.querySelector('.cell-title').textContent.trim();
+  const artist=row.querySelector('.cell-artist').textContent.trim();
+  if(!title&&!artist){alert('曲名またはアーティスト名を入力してください。');return;}
+  const btn=row.querySelector('.btn-search-yt');
+  const status=row.querySelector('.search-status');
+  btn.disabled=true;btn.textContent='検索中…';status.textContent='';status.className='search-status';
+  try{
+    const q=encodeURIComponent(`${title} ${artist} official`);
+    const sr=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q}&type=video&maxResults=1&key=${key}`);
+    const sd=await sr.json();
+    if(sd.error)throw new Error(sd.error.message);
+    if(!sd.items?.length)throw new Error('動画が見つかりませんでした');
+    const vid=sd.items[0].id.videoId;
+    const ytUrl=`https://www.youtube.com/watch?v=${vid}`;
+    setYtLink(row,ytUrl);
+    // 尺・アートワークは iTunes から取得（YouTube より正確）
+    await fetchArtwork(row);
+    status.textContent='✓ 取得完了';
+  }catch(e){
+    status.textContent='⚠ '+e.message;status.className='search-status err';
+  }
+  btn.disabled=false;btn.textContent='🔍 再検索';
+}
+
+/* ── Desktop drag & drop ── */
+let dragSrc=null;
+function setupDeskDrag(row){
+  const handle=row.querySelector('.drag-handle');
+  handle.addEventListener('mousedown',()=>row.draggable=true);
+  row.querySelectorAll('.editable,.dur-cell,.scene-select').forEach(el=>{
+    el.addEventListener('mousedown',()=>row.draggable=false);
+    el.addEventListener('blur',()=>row.draggable=true);
+  });
+  row.addEventListener('dragstart',e=>{dragSrc=row;row.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+  row.addEventListener('dragend',()=>{
+    dragSrc=null;
+    document.querySelectorAll('.song-row').forEach(r=>r.classList.remove('dragging','drag-over'));
+    updateNumbers();
+  });
+  row.addEventListener('dragover',e=>{
+    e.preventDefault();
+    if(dragSrc&&dragSrc!==row){
+      document.querySelectorAll('.song-row').forEach(r=>r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    }
+  });
+  row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));
+  row.addEventListener('drop',e=>{
+    e.preventDefault();
+    if(!dragSrc||dragSrc===row)return;
+    const list=document.getElementById('song-list');
+    const rows=[...list.children];
+    const si=rows.indexOf(dragSrc),ti=rows.indexOf(row);
+    list.insertBefore(dragSrc,si<ti?row.nextSibling:row);
+    row.classList.remove('drag-over');
+  });
+}
+
+/* ── Touch drag & drop ── */
+function setupTouchDrag(row){
+  const handle=row.querySelector('.drag-handle');
+  if(!handle)return;
+  let ghost=null,ph=null,offsetY=0;
+  handle.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    const rect=row.getBoundingClientRect();
+    offsetY=t.clientY-rect.top;
+    ghost=row.cloneNode(true);
+    Object.assign(ghost.style,{
+      position:'fixed',left:rect.left+'px',top:rect.top+'px',
+      width:rect.width+'px',zIndex:9999,pointerEvents:'none',
+      opacity:'0.85',boxShadow:'0 8px 24px rgba(0,0,0,.18)',
+      borderRadius:'14px',background:'#fff',
+    });
+    document.body.appendChild(ghost);
+    ph=document.createElement('div');
+    ph.style.cssText=`height:${rect.height}px;background:#e8f5e9;border:2px dashed #4caf50;border-radius:14px;margin-bottom:10px;`;
+    row.parentNode.insertBefore(ph,row.nextSibling);
+    row.style.opacity='0.2';
+  },{passive:false});
+  handle.addEventListener('touchmove',e=>{
+    if(!ghost)return;
+    e.preventDefault();
+    const t=e.touches[0];
+    ghost.style.top=(t.clientY-offsetY)+'px';
+    ghost.style.display='none';
+    const el=document.elementFromPoint(t.clientX,t.clientY);
+    ghost.style.display='';
+    const target=el?.closest('#song-list .song-row');
+    if(target&&target!==row){
+      const mid=target.getBoundingClientRect().top+target.getBoundingClientRect().height/2;
+      row.parentNode.insertBefore(ph,t.clientY<mid?target:target.nextSibling);
+    }
+  },{passive:false});
+  handle.addEventListener('touchend',()=>{
+    if(!ghost)return;
+    row.style.opacity='';
+    ph.parentNode.insertBefore(row,ph);
+    ph.remove();ghost.remove();ghost=null;ph=null;
+    updateNumbers();
+  });
+}
+
+/* ══════════════════════════════════════════
+   Song data  ※YouTubeは公式/公認チャンネル優先
+══════════════════════════════════════════ */
+const SONGS = [
+  {title:"September",                       artist:"EARTH, WIND & FIRE",  url:"https://www.youtube.com/watch?v=Gs069dndIYk", dur:"3:35"},
+  {title:"セプテンバーさん",                 artist:"RADWIMPS",            url:"https://www.youtube.com/watch?v=gnmqEaiYfUg", dur:"5:07"},
+  {title:"Tokimeki",                         artist:"Vaundy",              url:"https://www.youtube.com/watch?v=-_PKhPMXMDY", dur:"3:32"},
+  {title:"きらり",                           artist:"藤井風",              url:"https://www.youtube.com/watch?v=TcLLpZBWsck", dur:"3:52"},
+  {title:"喜劇",                             artist:"星野源",              url:"https://www.youtube.com/watch?v=D_Oyplmhhv0", dur:"3:52"},
+  {title:"Family Song",                      artist:"星野源",              url:"https://www.youtube.com/watch?v=Ucbp-Ej5RpI", dur:"4:17"},
+  {title:"サイダーのように言葉が湧き上がる", artist:"never young beach",   url:"https://www.youtube.com/watch?v=Ab0sFl0VDOY", dur:"4:09"},
+  {title:"September",                        artist:"James Arthur",        url:"https://www.youtube.com/watch?v=uJViyj5z6aY", dur:"3:41"},
+  {title:"そんなことがすてきです",           artist:"大橋トリオ",          url:"https://www.youtube.com/watch?v=y31bVVUhsZg", dur:"3:43"},
+  {title:"Why",                              artist:"星野源",              url:"https://www.youtube.com/watch?v=Q-Ec_n81iyc", dur:"4:03"},
+  {title:"美しい鰭",                         artist:"スピッツ",            url:"https://www.youtube.com/watch?v=KbGPM9jFeGg", dur:"3:50"},
+  {title:"カタオモイ",                       artist:"Aimer",               url:"https://www.youtube.com/watch?v=kxs9Su_mbpU", dur:"3:27"},
+  {title:"World's Smallest Violin",          artist:"AJR",                 url:"https://www.youtube.com/watch?v=PEnJbjBuxnw", dur:"3:00"},
+  {title:"タイムパラドックス",               artist:"Vaundy",              url:"https://www.youtube.com/watch?v=ewhRE-BvJCg", dur:"3:46"},
+  {title:"愛の花",                           artist:"あいみょん",          url:"https://www.youtube.com/watch?v=JuyQQUqD64c", dur:"3:56"},
+  {title:"告白",                             artist:"RADWIMPS",            url:"https://www.youtube.com/watch?v=NWKkoVNIv94", dur:"6:41"},
+  {title:"かみつきたい",                     artist:"カネコアヤノ",        url:"https://www.youtube.com/watch?v=zaU2ziKA7OE", dur:"4:37"},
+  {title:"本当はね、",                       artist:"ヤングスキニー",      url:"https://www.youtube.com/watch?v=cxM_FmezzFA", dur:"3:21"},
+  {title:"怪獣の腕のなか",                  artist:"きのこ帝国",          url:"https://www.youtube.com/watch?v=W4eFAWRAPtY", dur:"5:40"},
+  {title:"ずっと好きだった",                 artist:"斉藤和義",            url:"https://www.youtube.com/watch?v=PG8xpE7Fl-I", dur:"4:06"},
+  {title:"Lovers",                           artist:"sumika",              url:"https://www.youtube.com/watch?v=FFITBgsyVr4", dur:"4:11"},
+  {title:"花束にして",                       artist:"wacci",               url:"https://www.youtube.com/watch?v=i3iqO5ho3Dk", dur:"5:08"},
+];
+
+/* ── Init ── */
+renderFilterBar();
+const list=document.getElementById('song-list');
+SONGS.forEach((s,i)=>{
+  const row=makeRow(s);
+  list.appendChild(row);
+  // Stagger iTunes requests to avoid rate limits
+  setTimeout(()=>fetchArtwork(row),i*200);
+});
+updateNumbers();
+updateKeyBtn();
+</script>
+</body>
+</html>
