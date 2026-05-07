@@ -475,8 +475,8 @@ function makeRow(s){
   delBtn.addEventListener('click',()=>deleteRow(delBtn));
   delBtn.addEventListener('touchend',e=>{e.preventDefault();deleteRow(delBtn);});
 
-  row.querySelector('.dur-cell').addEventListener('input',updateTotal);
-  row.querySelector('.scene-select').addEventListener('change',()=>applyFilter());
+  row.querySelector('.dur-cell').addEventListener('input',()=>{updateTotal();triggerSave();});
+  row.querySelector('.scene-select').addEventListener('change',()=>{applyFilter();triggerSave();});
 
   // Re-fetch artwork when title/artist change
   const debouncedFetch=debounce(()=>fetchArtwork(row),800);
