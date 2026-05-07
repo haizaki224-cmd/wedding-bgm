@@ -409,6 +409,7 @@ async function fetchArtwork(row){
         if(match.trackTimeMillis){
           row.querySelector('.dur-cell').textContent=millisToMmSs(match.trackTimeMillis);
           updateTotal();
+          triggerSave();
         }
         return;
       }
